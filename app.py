@@ -119,6 +119,11 @@ async def create_prediction(file: UploadFile = File(..., description="File gamba
         print(f"Unexpected server error: {e}")
         raise HTTPException(status_code=500, detail="Terjadi kesalahan internal pada server saat memproses permintaan Anda.")
 
+@app.get("/wakeup")
+def wakeup():
+    status = "ready" if model else "not ready"
+    return {"status": f"API is awake and model is {status} 🚀"}
+
 if __name__ == "__main__":
     uvicorn_host = os.getenv("UVICORN_HOST", "0.0.0.0")
     uvicorn_port = int(os.getenv("UVICORN_PORT", 8000)) 
