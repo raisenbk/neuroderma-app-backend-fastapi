@@ -9,9 +9,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY model ./model
 
-COPY app.py .
-
-COPY .env .
+COPY . .
 
 EXPOSE 8000
 

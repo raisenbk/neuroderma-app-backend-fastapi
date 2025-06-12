@@ -24,13 +24,14 @@ origins = json.loads(origins_str)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    # allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
-MODEL_PATH = os.getenv('MODEL_PATH', 'model/final_best_model_vgg19_finetuned.h5')
+MODEL_PATH = os.getenv('MODEL_PATH', 'model/final_best_model_vgg19_finetuned_tes.h5')
 
 image_size_str = os.getenv('IMAGE_SIZE', '(224, 224)')
 IMAGE_SIZE = tuple(map(int, image_size_str.strip('()').split(',')))
