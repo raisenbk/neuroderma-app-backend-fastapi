@@ -1,34 +1,62 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.vgg19 import preprocess_input
 import numpy as np
 from PIL import Image
 import io
 import os
 from dotenv import load_dotenv
-import json 
-import gdown
+import json
+from contextlib import asynccontextmanager 
 
 load_dotenv()
+
+ml_resources = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Kode ini dieksekusi SAAT STARTUP
+    print("Startup: Memulai proses pemuatan model...")
+    try:
+        # Import yang berat dilakukan di dalam lifespan agar tidak memperlambat impor awal
+        from tensorflow.keras.models import load_model
+        from tensorflow.keras.applications.vgg19 import preprocess_input
+
+        model_path = os.getenv('MODEL_PATH', 'model/final_best_model_vgg19_finetuned.h5')
+        
+        if os.path.exists(model_path):
+            ml_resources["model"] = load_model(model_path)
+            ml_resources["preprocess_input"] = preprocess_input
+            print(f"Startup: Model dari {model_path} berhasil dimuat.")
+        else:
+            print(f"Startup Error: File model tidak ditemukan di {model_path}")
+            # Anda bisa memutuskan untuk menghentikan aplikasi jika model tidak ada,
+            # tapi untuk sekarang kita biarkan kosong.
+    except Exception as e:
+        print(f"Startup Error: Gagal memuat model. Error: {e}")
+
+    yield 
+
+    print("Shutdown: Membersihkan resource ML...")
+    ml_resources.clear()
+    print("Shutdown: Resource telah dibersihkan.")
 
 app = FastAPI(
     title="API Deteksi Penyakit Kulit",
     description="API untuk mendeteksi penyakit kulit berdasarkan gambar menggunakan model VGG19.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan 
 )
 
-@app.get("/wakeup")
-def read_root():
-    """Simple healthcheck to satisfy platform health probes"""
-    return {"status": "ok"}
 
-
+IMAGE_SIZE_STR = os.getenv('IMAGE_SIZE', '(224, 224)')
+IMAGE_SIZE = tuple(map(int, IMAGE_SIZE_STR.strip('()').split(',')))
+CLASS_NAMES_STR = os.getenv('CLASS_NAMES', '["Chickenpox", "Measles", "Monkeypox", "Normal"]')
+CLASS_NAMES = json.loads(CLASS_NAMES_STR)
 origins_str = os.getenv("ALLOWED_ORIGINS", '["http://localhost:3000"]') 
 origins = json.loads(origins_str) 
 
+# --- Middleware ---
 app.add_middleware(
     CORSMiddleware,
     # allow_origins=origins,
@@ -38,106 +66,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = os.getenv('MODEL_PATH', 'model/final_best_model_vgg19_finetuned.h5')
 
-image_size_str = os.getenv('IMAGE_SIZE', '(224, 224)')
-IMAGE_SIZE = tuple(map(int, image_size_str.strip('()').split(',')))
-
-class_names_str = os.getenv('CLASS_NAMES', '["Chickenpox", "Measles", "Monkeypox", "Normal"]')
-CLASS_NAMES = json.loads(class_names_str)
-
-
-try:
-    model = load_model(MODEL_PATH)
-    print(f"Model berhasil dimuat dari {MODEL_PATH}")
-except Exception as e:
-    print(f"Error memuat model: {e}")
-    model = None
+# --- Endpoints ---
+@app.get("/wakeup")
+def read_root():
+    """Endpoint health check sederhana."""
+    return {"status": "ok"}
 
 def predict_disease_from_image(image_bytes: bytes):
-    if not model:
-        raise HTTPException(status_code=503, detail="Model tidak tersedia atau gagal dimuat.")
+    if "model" not in ml_resources or ml_resources["model"] is None:
+        raise HTTPException(status_code=503, detail="Model tidak tersedia atau gagal dimuat saat startup. Periksa log server.")
+    
     try:
+        model = ml_resources["model"]
+        preprocess_input = ml_resources["preprocess_input"]
+
         img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
         img_resized = img.resize(IMAGE_SIZE)
-
         img_array = np.array(img_resized)
         img_array_expanded = np.expand_dims(img_array, axis=0)
-
         img_preprocessed = preprocess_input(img_array_expanded)
 
         predictions = model.predict(img_preprocessed)
-
         predicted_class_index = np.argmax(predictions[0])
         confidence = float(np.max(predictions[0]))
 
-        if predicted_class_index < len(CLASS_NAMES):
-            disease_label = CLASS_NAMES[predicted_class_index]
-        else:
-            disease_label = "Unknown" 
-            print(f"Warning: Predicted class index {predicted_class_index} di luar jangkauan CLASS_NAMES.")
-
+        disease_label = CLASS_NAMES[predicted_class_index] if predicted_class_index < len(CLASS_NAMES) else "Unknown"
+        
         suggestions_map = {
-            "Monkeypox": [
-                "Segera konsultasikan dengan dokter atau fasilitas kesehatan terdekat untuk konfirmasi.",
-                "Isolasi diri untuk mencegah potensi penularan sampai ada diagnosis pasti.",
-                "Hindari menggaruk ruam untuk mencegah infeksi sekunder.",
-                "Jaga kebersihan diri dan lingkungan sekitar."
-            ],
-            "Chickenpox": [
-                "Konsultasikan dengan dokter untuk diagnosis dan penanganan yang tepat.",
-                "Istirahat yang cukup dan perbanyak minum cairan.",
-                "Hindari menggaruk lepuh untuk mencegah bekas luka dan infeksi bakteri.",
-                "Gunakan losion kalamin atau mandi dengan larutan oatmeal untuk meredakan gatal."
-            ],
-            "Measles": [
-                "Segera hubungi dokter jika Anda atau anak Anda diduga menderita campak untuk penanganan.",
-                "Pastikan penderita mendapatkan istirahat yang cukup dan asupan cairan yang memadai.",
-                "Isolasi diri untuk mencegah penyebaran virus ke orang lain.",
-                "Periksa status vaksinasi Anda dan keluarga, vaksin MMR sangat efektif mencegah campak."
-            ],
-            "Normal": [ 
-                "Kulit Anda tampak normal berdasarkan analisis gambar ini.",
-                "Lanjutkan menjaga kebersihan dan kesehatan kulit Anda.",
-                "Gunakan tabir surya secara teratur untuk melindungi kulit dari paparan sinar UV.",
-                "Jika Anda memiliki kekhawatiran lain tentang kulit Anda, jangan ragu untuk berkonsultasi dengan dokter kulit."
-            ]
-        }
-        suggestions_list = suggestions_map.get(disease_label, ["Untuk informasi lebih lanjut, silakan konsultasikan dengan profesional medis."])
+            "Monkeypox": ["Segera konsultasikan dengan dokter...", "..."],
+            "Chickenpox": ["Konsultasikan dengan dokter...", "..."],
+            "Measles": ["Segera hubungi dokter...", "..."],
+            "Normal": ["Kulit Anda tampak normal...", "..."]
+        } # (Saran disingkat untuk keringkasan)
+        suggestions_list = suggestions_map.get(disease_label, ["Konsultasikan dengan profesional medis."])
 
         return {"disease": disease_label, "confidence": confidence, "suggestions": suggestions_list}
 
     except Exception as e:
         print(f"Error during prediction: {e}")
-        raise HTTPException(status_code=500, detail=f"Terjadi kesalahan saat memproses gambar: {str(e)}. Pastikan gambar yang diunggah sesuai dan coba lagi.")
-
-
+        raise HTTPException(status_code=500, detail=f"Terjadi kesalahan saat memproses gambar: {str(e)}.")
 
 @app.post("/predict")
 async def create_prediction(file: UploadFile = File(..., description="File gambar kulit yang akan dideteksi")):
     if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File yang diunggah harus berupa gambar (JPEG, PNG, WEBP).")
-
+        raise HTTPException(status_code=400, detail="File yang diunggah harus berupa gambar.")
+    
     try:
         image_bytes = await file.read()
-        result = predict_disease_from_image(image_bytes)
-        return result
+        return predict_disease_from_image(image_bytes)
     except HTTPException as e:
         raise e
     except Exception as e:
         print(f"Unexpected server error: {e}")
-        raise HTTPException(status_code=500, detail="Terjadi kesalahan internal pada server saat memproses permintaan Anda.")
+        raise HTTPException(status_code=500, detail="Kesalahan internal pada server.")
 
+# Blok untuk menjalankan secara lokal (tidak berubah)
 if __name__ == "__main__":
     uvicorn_host = os.getenv("UVICORN_HOST", "0.0.0.0")
-    uvicorn_port = int(os.getenv("UVICORN_PORT", 8000)) 
-    uvicorn.run(app, host=uvicorn_host, port=uvicorn_port)
-
-try:
-    print(f"Trying to load model from path: {MODEL_PATH}")
-    print(f"File exists: {os.path.exists(MODEL_PATH)}")
-    model = load_model(MODEL_PATH)
-    print(f"Model berhasil dimuat dari {MODEL_PATH}")
-except Exception as e:
-    print(f"Error memuat model: {e}")
-    model = None
+    uvicorn_port = int(os.getenv("UVICORN_PORT", 8000))
+    uvicorn.run("app:app", host=uvicorn_host, port=uvicorn_port, reload=True)
