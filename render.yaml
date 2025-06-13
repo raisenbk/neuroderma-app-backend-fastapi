@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: neuroderma-backend
+    env: docker
+    repo: https://github.com/raisenbk/neuroderma-app-backend-fastapi 
+    region: singapore 
+    plan: free 
+    
+    healthCheckPath: /wakeup
+
+    envVars:
+      - key: MODEL_PATH
+        value: model/final_best_model_vgg19_finetuned.h5
+      - key: IMAGE_SIZE
+        value: '(224, 224)'
+      - key: CLASS_NAMES
+        value: '["Chickenpox", "Measles", "Monkeypox", "Normal"]'
+      - key: MODEL_FILE_ID
+        value: 1gj0Pmc81NBZg6tr41TSPLoJVnhIUSse3 
+      - key: PYTHON_VERSION
+        value: '3.10'
+        
+cronJobs:
+  - name: wakeup-service
+    schedule: "*/14 * * * *"
+    command: "curl -sS https://neuroderma-backend.onrender.com/wakeup"
