@@ -5,24 +5,18 @@ import uvicorn
 import numpy as np
 from PIL import Image
 from dotenv import load_dotenv
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.vgg19 import preprocess_input
+import onnxruntime as ort 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-# Muat environment variables dari file .env
 load_dotenv()
 
-# Inisialisasi FastAPI App
 app = FastAPI(
     title="API Deteksi Penyakit Kulit",
-    description="API untuk mendeteksi penyakit kulit berdasarkan gambar menggunakan model VGG19.",
+    description="API untuk mendeteksi penyakit kulit berdasarkan gambar menggunakan model VGG19 (ONNX).",
     version="1.0.0"
 )
 
-# Konfigurasi CORS (Cross-Origin Resource Sharing)
-# Mengizinkan semua origin untuk kemudahan pengembangan, bisa disesuaikan nanti.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,56 +25,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pengaturan dari Environment Variables
-MODEL_PATH = os.getenv('MODEL_PATH', 'model/final_best_model_vgg19_finetuned.h5')
+MODEL_PATH_ONNX = os.getenv('MODEL_PATH_ONNXH', 'model/final_best_model_vgg19_finetuned.onnx') 
 IMAGE_SIZE_STR = os.getenv('IMAGE_SIZE', '(224, 224)')
 IMAGE_SIZE = tuple(map(int, IMAGE_SIZE_STR.strip('()').split(',')))
 CLASS_NAMES_STR = os.getenv('CLASS_NAMES', '["Chickenpox", "Measles", "Monkeypox", "Normal"]')
 CLASS_NAMES = json.loads(CLASS_NAMES_STR)
 
-# Variabel global untuk menampung model, diinisialisasi dengan None
-model = None
+ort_session = None
+input_name = None
 
 @app.on_event("startup")
 async def startup_event():
     """
-    Fungsi ini akan dijalankan sekali saat aplikasi FastAPI dimulai.
-    Ini adalah tempat terbaik untuk memuat model.
+    Memuat model ONNX saat aplikasi dimulai.
     """
-    global model
+    global ort_session, input_name
     print("Memulai proses startup aplikasi...")
-    if not os.path.exists(MODEL_PATH):
-        print(f"ERROR: File model tidak ditemukan di '{MODEL_PATH}'.")
-        print("Pastikan skrip download_model.py berhasil dijalankan sebelum server dimulai.")
-        # Aplikasi akan tetap berjalan, tapi endpoint /predict akan mengembalikan error.
+    if not os.path.exists(MODEL_PATH_ONNX):
+        print(f"ERROR: File model tidak ditemukan di '{MODEL_PATH_ONNX}'.")
         return
 
     try:
-        print(f"Mencoba memuat model dari: {MODEL_PATH}")
-        model = load_model(MODEL_PATH)
-        print("Model berhasil dimuat.")
+        print(f"Mencoba memuat model ONNX dari: {MODEL_PATH_ONNX}")
+        ort_session = ort.InferenceSession(MODEL_PATH_ONNX)
+        input_name = ort_session.get_inputs()[0].name 
+        print(f"Model ONNX berhasil dimuat. Nama input: {input_name}")
     except Exception as e:
-        print(f"Terjadi error fatal saat memuat model: {e}")
-        # Model akan tetap None jika gagal dimuat.
+        print(f"Terjadi error fatal saat memuat model ONNX: {e}")
 
 @app.get("/")
 def read_root():
     """Endpoint untuk health check."""
     return {"status": "ok", "message": "API is running."}
 
+def preprocess_image(image_bytes: bytes):
+    """
+    Fungsi untuk memproses gambar agar sesuai dengan input model ONNX.
+    """
+    img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+    img_resized = img.resize(IMAGE_SIZE)
+    img_array = np.array(img_resized)
+    img_array_expanded = np.expand_dims(img_array, axis=0)
+    
+    return img_array_expanded.astype(np.float32)
+
+
 def predict_disease_from_image(image_bytes: bytes):
-    """Fungsi untuk memproses gambar dan melakukan prediksi."""
-    if model is None:
-        raise HTTPException(status_code=503, detail="Model tidak tersedia atau gagal dimuat. Silakan periksa log server.")
+    """Fungsi untuk memproses gambar dan melakukan prediksi menggunakan ONNX Runtime."""
+    if ort_session is None:
+        raise HTTPException(status_code=503, detail="Model tidak tersedia atau gagal dimuat.")
 
     try:
-        img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-        img_resized = img.resize(IMAGE_SIZE)
-        img_array = np.array(img_resized)
-        img_array_expanded = np.expand_dims(img_array, axis=0)
-        img_preprocessed = preprocess_input(img_array_expanded)
+        img_preprocessed = preprocess_image(image_bytes)
 
-        predictions = model.predict(img_preprocessed)
+        ort_inputs = {input_name: img_preprocessed}
+        ort_outs = ort_session.run(None, ort_inputs)
+        
+        predictions = ort_outs[0] 
         predicted_class_index = np.argmax(predictions[0])
         confidence = float(np.max(predictions[0]))
 
