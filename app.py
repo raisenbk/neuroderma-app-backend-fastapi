@@ -105,6 +105,10 @@ def predict_disease_from_image(image_bytes: bytes):
         print(f"Error during prediction: {e}")
         raise HTTPException(status_code=500, detail=f"Terjadi kesalahan saat memproses gambar: {str(e)}. Pastikan gambar yang diunggah sesuai dan coba lagi.")
 
+@app.get("/")
+def read_root():
+    return {"message": "NeuroDerma backend is up and running!"}
+
 @app.post("/predict")
 async def create_prediction(file: UploadFile = File(..., description="File gambar kulit yang akan dideteksi")):
     if not file.content_type.startswith('image/'):
