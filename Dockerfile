@@ -2,8 +2,24 @@ FROM python:3.10-slim-buster
 
 WORKDIR /app
 
+# Install system dependencies needed by numpy, pillow, onnxruntime, etc.
+# build-essential: Diperlukan untuk kompilasi
+# libgomp1: Diperlukan oleh ONNX Runtime
+# libjpeg-dev, zlib1g-dev: Diperlukan oleh Pillow (untuk format JPEG, PNG)
+# libgl1-mesa-glx, libglib2.0-0: Diperlukan oleh OpenCV yang mungkin menjadi dependensi ONNX Runtime
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgomp1 \
+    libjpeg-dev \
+    zlib1g-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 
+# Now, run pip install
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -11,11 +27,9 @@ COPY . .
 
 EXPOSE 8000
 
-# ---- UBAH BARIS DI BAWAH INI ----
-# Beri waktu 5 menit (300 detik) sebelum health check pertama dimulai
+# Waktu startup 10 menit (600s) cukup lama, pastikan ini memang diperlukan
 HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
   CMD curl --fail http://localhost:8000/ || exit 1
 
-# ---- PASTIKAN CMD SEPERTI DI BAWAH INI ----
-# CMD ini menjalankan skrip download, DAN SETELAH SELESAI, menjalankan server Uvicorn
+# CMD ini sudah benar, menjalankan server Uvicorn
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
