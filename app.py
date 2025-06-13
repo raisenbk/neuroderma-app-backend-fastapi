@@ -20,7 +20,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@app.get("/")
+@app.get("/wakeup")
 def read_root():
     """Simple healthcheck to satisfy platform health probes"""
     return {"status": "ok"}
