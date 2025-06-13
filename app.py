@@ -10,7 +10,6 @@ import io
 import os
 from dotenv import load_dotenv
 import json 
-import gdown
 
 load_dotenv()
 
