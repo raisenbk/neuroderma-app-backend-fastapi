@@ -1,40 +1,28 @@
 import os
-import requests
 from pathlib import Path
+import gdown
 
-def download_from_gdrive(file_id, dest_path):
-    print("Mengunduh model dari Google Drive...")
+MODEL_PATH = os.getenv("MODEL_PATH", "model/final_best_model_vgg19_finetuned.h5")
+MODEL_FILE_ID = os.getenv("MODEL_FILE_ID")
 
-    def get_confirm_token(response):
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                return value
-        return None
+def ensure_model_downloaded():
+    if os.path.exists(MODEL_PATH):
+        print(f"Model sudah ada di {MODEL_PATH}")
+        return
 
-    def save_response_content(response, destination):
-        CHUNK_SIZE = 32768
-        with open(destination, 'wb') as f:
-            for chunk in response.iter_content(CHUNK_SIZE):
-                if chunk: 
-                    f.write(chunk)
-
-    url = "https://docs.google.com/uc?export=download"
-    session = requests.Session()
-    response = session.get(url, params={'id': file_id}, stream=True)
-
-    token = get_confirm_token(response)
-    if token:
-        response = session.get(url, params={'id': file_id, 'confirm': token}, stream=True)
-
-    Path(os.path.dirname(dest_path)).mkdir(parents=True, exist_ok=True)
-    save_response_content(response, dest_path)
-    print(f"Model berhasil diunduh ke {dest_path}")
-
-MODEL_PATH = os.getenv('MODEL_PATH', 'model/final_best_model_vgg19_finetuned.h5')
-MODEL_FILE_ID = os.getenv('MODEL_FILE_ID') 
-
-if not os.path.exists(MODEL_PATH):
-    if MODEL_FILE_ID:
-        download_from_gdrive(MODEL_FILE_ID, MODEL_PATH)
-    else:
+    if not MODEL_FILE_ID:
         print("MODEL_FILE_ID tidak ditemukan di environment variable.")
+        return
+
+    print("Mengunduh model dari Google Drive...")
+    Path(os.path.dirname(MODEL_PATH)).mkdir(parents=True, exist_ok=True)
+
+    url = f"https://drive.google.com/uc?id={MODEL_FILE_ID}"
+    try:
+        gdown.download(url, MODEL_PATH, quiet=False)
+        print(f"Model berhasil diunduh ke {MODEL_PATH}")
+    except Exception as e:
+        print(f"Gagal mengunduh model: {e}")
+
+if __name__ == "__main__":
+    ensure_model_downloaded()

@@ -10,6 +10,7 @@ import io
 import os
 from dotenv import load_dotenv
 import json 
+import gdown
 
 load_dotenv()
 
@@ -128,3 +129,12 @@ if __name__ == "__main__":
     uvicorn_host = os.getenv("UVICORN_HOST", "0.0.0.0")
     uvicorn_port = int(os.getenv("UVICORN_PORT", 8000)) 
     uvicorn.run(app, host=uvicorn_host, port=uvicorn_port)
+
+try:
+    print(f"Trying to load model from path: {MODEL_PATH}")
+    print(f"File exists: {os.path.exists(MODEL_PATH)}")
+    model = load_model(MODEL_PATH)
+    print(f"Model berhasil dimuat dari {MODEL_PATH}")
+except Exception as e:
+    print(f"Error memuat model: {e}")
+    model = None
