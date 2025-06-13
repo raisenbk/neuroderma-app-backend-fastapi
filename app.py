@@ -20,6 +20,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
+
+
 origins_str = os.getenv("ALLOWED_ORIGINS", '["http://localhost:3000"]') 
 origins = json.loads(origins_str) 
 
@@ -105,9 +110,7 @@ def predict_disease_from_image(image_bytes: bytes):
         print(f"Error during prediction: {e}")
         raise HTTPException(status_code=500, detail=f"Terjadi kesalahan saat memproses gambar: {str(e)}. Pastikan gambar yang diunggah sesuai dan coba lagi.")
 
-@app.get("/")
-def read_root():
-    return {"message": "NeuroDerma backend is up and running!"}
+
 
 @app.post("/predict")
 async def create_prediction(file: UploadFile = File(..., description="File gambar kulit yang akan dideteksi")):
