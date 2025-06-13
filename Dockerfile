@@ -18,4 +18,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
 
 # ---- PASTIKAN CMD SEPERTI DI BAWAH INI ----
 # CMD ini menjalankan skrip download, DAN SETELAH SELESAI, menjalankan server Uvicorn
-CMD ["sh", "-c", "python download_model.py && exec uvicorn app:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
