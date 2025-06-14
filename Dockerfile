@@ -23,13 +23,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY start.sh .
+RUN chmod +x ./start.sh
 
 EXPOSE 8000
 
-# Waktu startup 10 menit (600s) cukup lama, pastikan ini memang diperlukan
 HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
   CMD curl --fail http://localhost:8000/ || exit 1
 
-# CMD ini sudah benar, menjalankan server Uvicorn
-CMD ["sh", "-c", "python download_model.py && exec uvicorn app:app --host 0.0.0.0 --port 8000"]
+# Jalankan startup script
+CMD ["./start.sh"]

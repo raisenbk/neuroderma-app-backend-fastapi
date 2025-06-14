@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH_ONNX = os.getenv('MODEL_PATH_ONNXH', 'model/final_best_model_vgg19_finetuned.onnx') 
+MODEL_PATH_ONNX = os.getenv('MODEL_PATH_ONNX', 'model/final_best_model_vgg19_finetuned.onnx') 
 IMAGE_SIZE_STR = os.getenv('IMAGE_SIZE', '(224, 224)')
 IMAGE_SIZE = tuple(map(int, IMAGE_SIZE_STR.strip('()').split(',')))
 CLASS_NAMES_STR = os.getenv('CLASS_NAMES', '["Chickenpox", "Measles", "Monkeypox", "Normal"]')
