@@ -6,7 +6,7 @@ set -e
 
 # Jalankan skrip unduh. File berada di direktori kerja saat ini.
 echo "Running model download script..."
-python ./download_model.py
+python /download_model.py
 
 # Jalankan server aplikasi. Uvicorn akan menemukan 'app.py' di direktori kerja.
 echo "Starting Uvicorn server..."
