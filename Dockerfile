@@ -1,6 +1,6 @@
 FROM python:3.10-slim-buster
 
-WORKDIR /app
+WORKDIR /
 
 # Install system dependencies needed by numpy, pillow, onnxruntime, etc.
 # build-essential: Diperlukan untuk kompilasi
@@ -23,7 +23,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY start.sh .
+COPY . .
+
 RUN chmod +x ./start.sh
 
 EXPOSE 8000
