@@ -7,4 +7,4 @@ requirementss.txt
 model/final_best_model_vgg19_finetunedd.h5
 convert_to_onnx.py
 convert_to_onnx.py
-model/final_best_model_vgg19_finetunedd.onnx
+model/final_best_model_vgg19_finetuned.onnx
