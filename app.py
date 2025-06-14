@@ -19,7 +19,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://neuroderma-app-frontend-nextjs.vercel.app/"],
+    allow_origins=["https://neuroderma-app-frontend-nextjs-wqae.vercel.app/"],
     allow_credentials=True,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
