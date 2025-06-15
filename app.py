@@ -22,7 +22,7 @@ ALLOWED_ORIGINS = json.loads(ALLOWED_ORIGINS_STR)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins="https://neuroderma.vercel.app/",
     allow_credentials=True,
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["*"],
