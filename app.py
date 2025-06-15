@@ -17,9 +17,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
+ALLOWED_ORIGINS_STR = os.getenv('ALLOWED_ORIGINS', '["http://localhost:3000"]')
+ALLOWED_ORIGINS = json.loads(ALLOWED_ORIGINS_STR)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://neuroderma-app-frontend-nextjs-wqae.vercel.app"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["*"],
@@ -57,6 +60,11 @@ async def startup_event():
 def read_root():
     """Endpoint untuk health check."""
     return {"status": "ok", "message": "API is running."}
+
+@app.get("/ping")
+async def ping():
+    return {"status": "ok"}
+
 
 def preprocess_image(image_bytes: bytes):
     """
